@@ -240,18 +240,23 @@ class WorkStageDetail(APIView):
 
 
 # orderslip/views.py
+
 class InvoiceList(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, format=None):
-        invoices = Invoice.objects.all()
-        serializer = InvoiceSerializer(invoices, many=True)
-        return Response(serializer.data)
+    
+class InvoiceList(APIView):
+    permission_classes = [IsAuthenticated]
 
-    def post(self, request, format=None):   # ✅ inside the class
+    def post(self, request, format=None):
+        print("\n========== INVOICE DEBUG START ==========")
+        print("REQUEST DATA:", request.data)
+
         order_id = request.data.get("order")
+        print("RECEIVED ORDER ID:", order_id)
 
         if not order_id:
+            print("ERROR: ORDER ID IS MISSING")
             return Response(
                 {"order": ["Order is required."]},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -259,7 +264,11 @@ class InvoiceList(APIView):
 
         try:
             order = Order.objects.get(pk=order_id)
-        except (Order.DoesNotExist, ValueError):
+            print("FOUND ORDER ID:", order.id)
+            print("ORDER TENANT ID:", order.tenant_id)
+
+        except (Order.DoesNotExist, ValueError, TypeError):
+            print("ERROR: ORDER NOT FOUND")
             return Response(
                 {"order": ["Order not found."]},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -268,16 +277,37 @@ class InvoiceList(APIView):
         serializer = InvoiceSerializer(data=request.data)
 
         if serializer.is_valid():
-            invoice = serializer.save(tenant=order.tenant)
-            return Response(
-                InvoiceSerializer(invoice).data,
-                status=status.HTTP_201_CREATED,
+            print(
+                "SERIALIZER VALIDATED DATA:",
+                serializer.validated_data,
             )
+
+            try:
+                invoice = serializer.save(tenant=order.tenant, order=order)
+
+                print("INVOICE CREATED SUCCESSFULLY")
+                print("INVOICE ID:", invoice.id)
+                print("SAVED ORDER ID:", invoice.order_id)
+                print("========== INVOICE DEBUG END ==========\n")
+
+                return Response(
+                    InvoiceSerializer(invoice).data,
+                    status=status.HTTP_201_CREATED,
+                )
+
+            except Exception as error:
+                print("INVOICE SAVE FAILED:", repr(error))
+                raise
+
+        print("SERIALIZER ERRORS:", serializer.errors)
+        print("========== INVOICE DEBUG END ==========\n")
 
         return Response(
             serializer.errors,
             status=status.HTTP_400_BAD_REQUEST,
         )
+
+
 
 
 class InvoiceDetail(APIView):
