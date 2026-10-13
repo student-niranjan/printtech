@@ -2,8 +2,10 @@
 from django.urls import path
 
 from .views import (
+    MyAssignedWork,
     OrderSlipList,
     OrderSlipDetail,
+    Slipstaffassignwork,
     WorkStageList,
     WorkStageDetail,
     InvoiceList,
@@ -56,4 +58,16 @@ urlpatterns = [
         SlipItemDetail.as_view(),
         name="slip-item-detail",
     ),
+
+    path(
+        "slipassignwork/",
+        Slipstaffassignwork.as_view(),
+        name="slip-item-staff-assign-work",
+    ),
+
+    path(
+    "slipassignworks/",
+    MyAssignedWork.as_view(),
+    name="slip-item-staff-assign-work-detail",
+)
 ]

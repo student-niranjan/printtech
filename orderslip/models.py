@@ -56,7 +56,7 @@ class Order(models.Model):
         on_delete=models.PROTECT,
         related_name="orders_prepared",
     )
-
+    print_details_full = models.TextField(blank=True, help_text="Full print details for the order slip.")
     slip_date = models.DateField()
 
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)

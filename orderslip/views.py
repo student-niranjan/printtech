@@ -1,4 +1,5 @@
-
+# orderslip/views.py
+from django.db.models import Q
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -11,84 +12,101 @@ from .serailizers import (
     OrderSerializer,
     SlipItemSerializer,
     InvoiceSerializer,
+    SlipItemstaffSerializer,
     WorkStageSerializer,
 )
-from customers.models import Customer 
+from customers.models import Customer
 
 
+# ============================================
+# Order Slip List
+# ============================================
 class OrderSlipList(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, format=None):
-        orders = Order.objects.select_related(
-            "customer",
-            "tenant",
-            "prepared_by",
-        ).order_by("-created_at")
+        # Show orders belonging only to the logged-in user's tenant
+        orders = (
+            Order.objects
+            .filter(tenant=request.user.tenant)
+            .select_related(
+                "customer",
+                "tenant",
+                "prepared_by",
+            )
+            .order_by("-created_at")
+        )
 
         serializer = OrderSerializer(orders, many=True)
 
         return Response({
             "orders": serializer.data,
-        })
+        }, status=status.HTTP_200_OK)
 
     def post(self, request, format=None):
         data = request.data.copy()
 
-        # ============================================
-        # 1. Determine tenant + prepared_by
-        # ============================================
-        last_order = Order.objects.order_by("-created_at").first()
+        # 1. Get tenant and staff from the authenticated user
+        tenant = request.user.tenant
+        prepared_by = request.user
 
-        tenant_id = data.get("tenant") or (
-            last_order.tenant_id if last_order else None
-        )
-        prepared_by_id = data.get("prepared_by") or (
-            last_order.prepared_by_id if last_order else request.user.id
-        )
+        # 2. Get customer ID from request data
+        customer_id = data.get("customer")
 
-        if not tenant_id:
-            return Response(
-                {"tenant": ["Cannot determine tenant."]},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # ============================================
-        # 2. Auto-pick the NEWEST customer in tenant
-        # ============================================
-        customer_id = data.get("customer")   # Priority 1: frontend override
-
+        # 3. If customer ID is missing, select the newest
+        # customer belonging to the current tenant
         if not customer_id:
-            # Priority 2: newest customer in this tenant
-            newest = (
+            customer = (
                 Customer.objects
-                .filter(tenant_id=tenant_id)
-                .order_by("-created_at")     # newest first
+                .filter(tenant=tenant)
+                .order_by("-created_at")
                 .first()
             )
-            if newest:
-                customer_id = newest.id
 
-        if not customer_id:
-            return Response(
-                {"customer": ["No customer available. Please add a customer first."]},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            if not customer:
+                return Response(
+                    {
+                        "customer": [
+                            "No customer available for your tenant. "
+                            "Please add a customer first."
+                        ]
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            # 4. Verify the submitted customer belongs to this tenant
+            customer = Customer.objects.filter(
+                pk=customer_id,
+                tenant=tenant,
+            ).first()
 
-        # ============================================
-        # 3. Apply auto values
-        # ============================================
-        data["customer"] = customer_id
-        data["tenant"] = tenant_id
-        data["prepared_by"] = prepared_by_id
+            if not customer:
+                return Response(
+                    {
+                        "customer": [
+                            "Invalid customer or customer does not "
+                            "belong to your tenant."
+                        ]
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-        # ============================================
-        # 4. Save
-        # ============================================
+        # 5. Ignore tenant and prepared_by values supplied by the client
+        data["tenant"] = tenant.pk
+        data["prepared_by"] = prepared_by.pk
+        data["customer"] = customer.pk
+
+        # 6. Validate request data
         serializer = OrderSerializer(data=data)
 
         if serializer.is_valid():
-            order = serializer.save()
+            # Assign trusted relationships explicitly
+            order = serializer.save(
+                tenant=tenant,
+                prepared_by=prepared_by,
+                customer=customer,
+            )
+
             return Response(
                 OrderSerializer(order).data,
                 status=status.HTTP_201_CREATED,
@@ -98,6 +116,11 @@ class OrderSlipList(APIView):
             serializer.errors,
             status=status.HTTP_400_BAD_REQUEST,
         )
+
+
+# ============================================
+# Order Slip Detail
+# ============================================
 class OrderSlipDetail(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -155,6 +178,9 @@ class OrderSlipDetail(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+# ============================================
+# Work Stage List
+# ============================================
 class WorkStageList(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -186,6 +212,9 @@ class WorkStageList(APIView):
         )
 
 
+# ============================================
+# Work Stage Detail
+# ============================================
 class WorkStageDetail(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -239,12 +268,9 @@ class WorkStageDetail(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-# orderslip/views.py
-
-class InvoiceList(APIView):
-    permission_classes = [IsAuthenticated]
-
-    
+# ============================================
+# Invoice List
+# ============================================
 class InvoiceList(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -258,7 +284,6 @@ class InvoiceList(APIView):
         )
         serializer = InvoiceSerializer(invoices, many=True)
         return Response(serializer.data)
-
 
     def post(self, request, format=None):
         print("\n========== INVOICE DEBUG START ==========")
@@ -320,8 +345,9 @@ class InvoiceList(APIView):
         )
 
 
-
-
+# ============================================
+# Invoice Detail
+# ============================================
 class InvoiceDetail(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -375,11 +401,17 @@ class InvoiceDetail(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+# ============================================
+# Helper
+# ============================================
 def get_current_order():
     """Return the most recently created order."""
     return Order.objects.order_by("-created_at").first()
 
 
+# ============================================
+# Slip Item List
+# ============================================
 class SlipItemList(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -438,6 +470,9 @@ class SlipItemList(APIView):
         )
 
 
+# ============================================
+# Slip Item Detail
+# ============================================
 class SlipItemDetail(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -492,3 +527,62 @@ class SlipItemDetail(APIView):
         slip_item = self.get_object(pk)
         slip_item.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# ============================================
+# Slip Staff Assign Work
+# ============================================
+class Slipstaffassignwork(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, format=None):
+        slip_items = (
+            SlipItem.objects
+            .select_related(
+                "order",
+                "Designing_person",
+                "printing_person",
+                "binding_person",
+            )
+            .filter(order__tenant=request.user.tenant)
+            .order_by("-id")
+        )
+
+        serializer = SlipItemstaffSerializer(slip_items, many=True)
+        return Response(serializer.data)
+
+    # orderslip/views.py
+
+
+
+
+class MyAssignedWork(APIView):
+    """
+    Staff-only: shows slip items assigned to the logged-in user.
+    Matches if the user is designing, printing, OR binding.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, format=None):
+        user_id = request.user.id
+
+        slip_items = (
+            SlipItem.objects
+            .select_related(
+                "order",
+                "order__customer",
+                "Designing_person",
+                "printing_person",
+                "binding_person",
+            )
+            .filter(order__tenant=request.user.tenant)     # tenant scope
+            .filter(
+                Q(Designing_person_id=user_id)              # is designer
+                | Q(printing_person_id=user_id)             # OR is printer
+                | Q(binding_person_id=user_id)              # OR is binder
+            )
+            .order_by("-id")
+        )
+
+        serializer = SlipItemstaffSerializer(slip_items, many=True)
+        return Response(serializer.data)

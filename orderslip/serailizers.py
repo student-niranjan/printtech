@@ -5,12 +5,24 @@ from .models import (
     WorkStage,
     Invoice,
 )
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+# orderslip/serializers.py
+
+class StaffMiniSerializer(serializers.ModelSerializer):
+    """Minimal staff info for nested display."""
+    
+    class Meta:
+        model = User
+        fields = ["id", "username", "role"]
+        read_only_fields = fields
 
 from customers.models import Customer
 class CustomerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Customer
-        fields = ["id", "name","contact_no"]
+        fields = ["id", "name","contact_no","address","pan_no"]
 
 
 class OrderSerializer(serializers.ModelSerializer):
@@ -29,6 +41,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "customer_details",
             "prepared_by",
             "project_name",
+            "print_details_full",
             "description",
             "priority",
             "slip_date",
@@ -52,10 +65,25 @@ class OrderSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
+        
+
 class SlipItemSerializer(serializers.ModelSerializer):
+        designing_person_details = StaffMiniSerializer(
+                source="Designing_person",
+                read_only=True
+            )
+        printing_person_details = StaffMiniSerializer(
+                source="printing_person",  
+                read_only=True      
+            )
+        binding_person_details = StaffMiniSerializer(
+                source="binding_person",
+                read_only=True
+            )
+
         class Meta:
             model = SlipItem
-            fields = ["id", "order", "item_description", "quantity", "rate", "subtotal", "paper_type", "size", "maso", "Designing_person", "printing_person", "binding_person", "work_type" ]
+            fields = ["id", "order", "item_description", "quantity", "rate", "subtotal", "paper_type", "size", "maso", "Designing_person", "printing_person", "binding_person", "work_type", "designing_person_details", "printing_person_details", "binding_person_details"]
             read_only_fields = ["id", "subtotal"]
 
 
@@ -74,3 +102,17 @@ class InvoiceSerializer(serializers.ModelSerializer):
 
 
 
+# orderslip/serializers.py
+class SlipItemstaffSerializer(serializers.ModelSerializer):
+    designing_person_details = StaffMiniSerializer(source="Designing_person", read_only=True)
+    printing_person_details = StaffMiniSerializer(source="printing_person", read_only=True)
+    binding_person_details = StaffMiniSerializer(source="binding_person", read_only=True)
+
+    class Meta:
+        model = SlipItem
+        fields = [
+            "id", "order", "item_description",
+            "Designing_person", "designing_person_details",
+            "printing_person", "printing_person_details",
+            "binding_person", "binding_person_details",
+        ]

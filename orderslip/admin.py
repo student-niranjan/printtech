@@ -50,6 +50,9 @@ class SlipItemAdmin(admin.ModelAdmin):
         "paper_type",
         "band_type",
         "work_type",
+        "Designing_person",
+        "printing_person",
+        "binding_person",
     )
     list_filter = ("order__slip_date", "order__tenant")
     search_fields = ("item_description", "order__slip_no", "order__customer__name")
