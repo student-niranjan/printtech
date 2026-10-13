@@ -71,7 +71,7 @@ class Order(models.Model):
         blank=True,
     )
 
-    print_details_full = models.TextField(blank=True)
+    description = models.TextField(blank=True)
 
     taken_by_signature = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -244,6 +244,7 @@ class Invoice(models.Model):
     payment_method = models.CharField(max_length=50, choices=PAYMENT_METHOD_CHOICES, default="cash", blank=True)
     paid_date = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending", blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["-paid_date"]

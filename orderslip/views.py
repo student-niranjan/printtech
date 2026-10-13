@@ -248,6 +248,18 @@ class InvoiceList(APIView):
 class InvoiceList(APIView):
     permission_classes = [IsAuthenticated]
 
+    def get(self, request, format=None):
+        """GET /orderslipapi/invoices/ — list invoices for user's tenant."""
+        invoices = (
+            Invoice.objects
+            .select_related("order", "tenant")
+            .filter(tenant=request.user.tenant)
+            .order_by("-created_at")
+        )
+        serializer = InvoiceSerializer(invoices, many=True)
+        return Response(serializer.data)
+
+
     def post(self, request, format=None):
         print("\n========== INVOICE DEBUG START ==========")
         print("REQUEST DATA:", request.data)

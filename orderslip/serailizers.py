@@ -10,7 +10,7 @@ from customers.models import Customer
 class CustomerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Customer
-        fields = ["id", "name"]
+        fields = ["id", "name","contact_no"]
 
 
 class OrderSerializer(serializers.ModelSerializer):
@@ -29,6 +29,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "customer_details",
             "prepared_by",
             "project_name",
+            "description",
             "priority",
             "slip_date",
             "delivery_date",
@@ -68,7 +69,7 @@ class WorkStageSerializer(serializers.ModelSerializer):
 class InvoiceSerializer(serializers.ModelSerializer):
         class Meta:
             model = Invoice
-            fields = ["id", "order", "amount","tenant"]
+            fields = ["id", "order", "amount","tenant","status","payment_method", "created_at"]
             read_only_fields = ["id","tenant"]
 
 
