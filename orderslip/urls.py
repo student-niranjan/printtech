@@ -12,6 +12,7 @@ from .views import (
     InvoiceDetail,
     SlipItemList,
     SlipItemDetail,
+    
 )
 
 urlpatterns = [
@@ -65,9 +66,14 @@ urlpatterns = [
         name="slip-item-staff-assign-work",
     ),
 
-    path(
+   path(
     "slipassignworks/",
     MyAssignedWork.as_view(),
-    name="slip-item-staff-assign-work-detail",
-)
+    name="slip-item-staff-assign-work",
+),
+path(
+    "slipassignworks/<int:pk>/",
+    MyAssignedWork.as_view(),
+    name="slip-item-staff-assign-work-update",
+),
 ]

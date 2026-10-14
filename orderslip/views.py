@@ -1,4 +1,5 @@
 # orderslip/views.py
+from django.db import transaction
 from django.db.models import Q
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
@@ -558,11 +559,16 @@ class Slipstaffassignwork(APIView):
 
 class MyAssignedWork(APIView):
     """
-    Staff-only: shows slip items assigned to the logged-in user.
-    Matches if the user is designing, printing, OR binding.
+    Staff-only view for managing their assigned slip items.
+    
+    - GET  /slipassignwork/         → list items assigned to the logged-in user
+    - PATCH /slipassignwork/<pk>/   → update the user's task status on one item
     """
     permission_classes = [IsAuthenticated]
 
+    # ─────────────────────────────────────────────
+    # LIST: My assigned work
+    # ─────────────────────────────────────────────
     def get(self, request, format=None):
         user_id = request.user.id
 
@@ -575,14 +581,100 @@ class MyAssignedWork(APIView):
                 "printing_person",
                 "binding_person",
             )
-            .filter(order__tenant=request.user.tenant)     # tenant scope
+            .filter(order__tenant=request.user.tenant)
             .filter(
-                Q(Designing_person_id=user_id)              # is designer
-                | Q(printing_person_id=user_id)             # OR is printer
-                | Q(binding_person_id=user_id)              # OR is binder
+                Q(Designing_person_id=user_id)
+                | Q(printing_person_id=user_id)
+                | Q(binding_person_id=user_id)
             )
             .order_by("-id")
         )
 
         serializer = SlipItemstaffSerializer(slip_items, many=True)
         return Response(serializer.data)
+
+    # ─────────────────────────────────────────────
+    # PATCH: Update my task status
+    # ─────────────────────────────────────────────
+    @transaction.atomic
+    def patch(self, request, pk, format=None):
+        user_id = request.user.id
+
+        # Find the item within the current tenant (with row lock)
+        item = get_object_or_404(
+            SlipItem.objects.select_for_update().filter(
+                order__tenant=request.user.tenant
+            ),
+            pk=pk,
+        )
+
+        # Only allow the assigned staff to update their own task status
+        allowed_fields = {
+            "designing_status": (
+                "Designing_person_id",
+                {"waiting", "in_progress", "completed"},
+            ),
+            "printing_status": (
+                "printing_person_id",
+                {"waiting", "in_progress", "completed"},
+            ),
+            "binding_status": (
+                "binding_person_id",
+                {"waiting", "in_progress", "completed"},
+            ),
+        }
+
+        # Must submit exactly one status field
+        if len(request.data) != 1:
+            return Response(
+                {"error": "Submit exactly one status field."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        field = next(iter(request.data))
+
+        if field not in allowed_fields:
+            return Response(
+                {"error": "Only task statuses can be updated."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        assigned_field, valid_values = allowed_fields[field]
+
+        # Ensure the logged-in user is the assigned person for that field
+        if getattr(item, assigned_field) != user_id:
+            return Response(
+                {"error": "You are not assigned to this task."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        new_status = request.data[field]
+
+        if new_status not in valid_values:
+            return Response(
+                {"error": "Invalid status value."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Enforce task dependencies
+        if field == "printing_status":
+            if item.designing_status != "completed":
+                return Response(
+                    {"error": "Designing must be completed first."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        if field == "binding_status":
+            if item.printing_status != "completed":
+                return Response(
+                    {"error": "Printing must be completed first."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        setattr(item, field, new_status)
+        item.save(update_fields=[field])
+
+        return Response(
+            SlipItemstaffSerializer(item).data,
+            status=status.HTTP_200_OK,
+        )

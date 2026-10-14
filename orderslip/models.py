@@ -146,9 +146,30 @@ class Order(models.Model):
             )
         return self
 
+
+
 class SlipItem(models.Model):
 
-    paper_type_choices = [
+    # ─────────── Status choices ───────────
+    DESIGNING_STATUS_CHOICES = [
+        ("waiting", "Waiting"),
+        ("in_progress", "In Progress"),
+        ("completed", "Completed"),
+    ]
+
+    PRINTING_STATUS_CHOICES = [
+        ("waiting", "Waiting"),
+        ("in_progress", "In Progress"),
+        ("completed", "Completed"),
+    ]
+
+    BINDING_STATUS_CHOICES = [
+        ("waiting", "Waiting"),
+        ("in_progress", "In Progress"),
+        ("completed", "Completed"),
+    ]
+
+    PAPER_TYPE_CHOICES = [
         ("art", "Art"),
         ("card", "Card"),
         ("newsprint", "Newsprint"),
@@ -156,28 +177,75 @@ class SlipItem(models.Model):
         ("uncoated", "Uncoated"),
     ]
 
+    # ─────────── Identification ───────────
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="slip_items")
 
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.CASCADE,
+        related_name="slip_items",
+    )
+
+    # ─────────── Item details ───────────
     item_description = models.CharField(max_length=255)
     quantity = models.PositiveIntegerField()
     rate = models.DecimalField(max_digits=10, decimal_places=2)
     size = models.CharField(max_length=100, blank=True)
     maso = models.CharField(max_length=100, blank=True)
-    paper_type = models.CharField(max_length=100, choices=paper_type_choices, blank=True)
+    paper_type = models.CharField(
+        max_length=100, choices=PAPER_TYPE_CHOICES, blank=True
+    )
     band_type = models.CharField(max_length=100, blank=True)
     work_type = models.CharField(max_length=100, blank=True)
     subtotal = models.DecimalField(max_digits=12, decimal_places=2)
+
+    # ─────────── Assigned staff ───────────
     Designing_person = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="designed_slip_items"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="designed_slip_items",
     )
     printing_person = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="printed_slip_items"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="printed_slip_items",
     )
     binding_person = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="bound_slip_items"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="bound_slip_items",
     )
 
+    # ─────────── Task statuses ───────────
+    designing_status = models.CharField(       # ✅ fixed typo
+        max_length=100,
+        choices=DESIGNING_STATUS_CHOICES,
+        default="waiting",
+        blank=True,
+    )                                           # ✅ no trailing comma
+
+    printing_status = models.CharField(
+        max_length=100,
+        choices=PRINTING_STATUS_CHOICES,
+        default="waiting",                      # ✅ fixed typo "wating" → "waiting"
+        blank=True,
+    )
+
+    binding_status = models.CharField(
+        max_length=100,
+        choices=BINDING_STATUS_CHOICES,
+        default="waiting",
+        blank=True,
+        # null=True removed ✅
+    )
+
+    # ─────────── Methods ───────────
     def save(self, *args, **kwargs):
         self.subtotal = self.quantity * self.rate
         super().save(*args, **kwargs)

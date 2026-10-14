@@ -6,6 +6,7 @@ from .models import (
     Invoice,
 )
 from django.contrib.auth import get_user_model
+from orderslip.models import Order
 
 User = get_user_model()
 # orderslip/serializers.py
@@ -104,6 +105,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
 
 # orderslip/serializers.py
 class SlipItemstaffSerializer(serializers.ModelSerializer):
+    order_details=OrderSerializer(source="order" ,read_only=True)
     designing_person_details = StaffMiniSerializer(source="Designing_person", read_only=True)
     printing_person_details = StaffMiniSerializer(source="printing_person", read_only=True)
     binding_person_details = StaffMiniSerializer(source="binding_person", read_only=True)
@@ -111,8 +113,23 @@ class SlipItemstaffSerializer(serializers.ModelSerializer):
     class Meta:
         model = SlipItem
         fields = [
-            "id", "order", "item_description",
-            "Designing_person", "designing_person_details",
-            "printing_person", "printing_person_details",
-            "binding_person", "binding_person_details",
-        ]
+        "id",
+        "order",
+        "order_details",
+        "item_description",
+        "Designing_person",
+        "designing_person_details",
+        "designing_status",
+        "printing_person",
+        "printing_person_details",
+        "printing_status",
+        "binding_person",
+        "binding_person_details",
+        "binding_status",
+    ]
+
+    extra_kwargs = {
+        "designing_status": {"required": False},
+        "printing_status": {"required": False},
+        "binding_status": {"required": False},
+    }
