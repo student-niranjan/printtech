@@ -72,7 +72,7 @@ urlpatterns = [
     name="slip-item-staff-assign-work",
 ),
 path(
-    "slipassignworks/<int:pk>/",
+    "slipassignworks/<uuid:pk>/",
     MyAssignedWork.as_view(),
     name="slip-item-staff-assign-work-update",
 ),

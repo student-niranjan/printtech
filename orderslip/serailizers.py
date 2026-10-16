@@ -84,7 +84,7 @@ class SlipItemSerializer(serializers.ModelSerializer):
 
         class Meta:
             model = SlipItem
-            fields = ["id", "order", "item_description", "quantity", "rate", "subtotal", "paper_type", "size", "maso", "Designing_person", "printing_person", "binding_person", "work_type", "designing_person_details", "printing_person_details", "binding_person_details"]
+            fields = ["id", "order", "item_description", "quantity", "rate", "subtotal", "paper_type", "size", "maso", "Designing_person", "printing_person", "binding_person", "work_type", "designing_person_details", "printing_person_details", "binding_person_details","designing_status","printing_status","binding_status"]
             read_only_fields = ["id", "subtotal"]
 
 
@@ -116,7 +116,15 @@ class SlipItemstaffSerializer(serializers.ModelSerializer):
         "id",
         "order",
         "order_details",
-        "item_description",
+        "item_description",         
+        "quantity",
+        "rate",
+        "subtotal",
+        "paper_type",
+        "size",
+        "maso",
+        "band_type",
+        "work_type",
         "Designing_person",
         "designing_person_details",
         "designing_status",
